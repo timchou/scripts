@@ -1,58 +1,36 @@
 #coding=utf-8
 from __future__ import division
 from pyhs import Manager,exceptions
-import sys,getopt,math,random,string,timeit,MySQLdb,multiprocessing
+import sys,getopt,math,random,string,timeit,multiprocessing,datetime
 
 n=0
 
-def read(hs):
-    '''
-    随机生成一个数字，查找uid匹配的记录
-    '''
-
-    uid=int(random.uniform(1,80000000))
-    #print 'select uid=%d' % uid
-    rows=hs.find('mydb', 'mytbl', '=',['uid','name'],[str(uid),])
-
-def insert(hs):
-    name=''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(10))
-    hs.insert('mydb', 'mytbl', [('name', name),])
-
-def delete(hs):
-    uid=int(random.uniform(1,80000000))
-    hs.delete('mydb', 'mytbl', '=' , ['uid','name'], [str(uid),])
-
-def update(hs):
-    uid=int(random.uniform(1,80000000))
-    name=''.join(random.choice(string.ascii_uppercase + string.digits) for x in range(10))
-    name=name + '_updated'
-    hs.update('mydb', 'mytbl', '=' , ['name',], [str(uid),] ,[name,])
-
-def write(hs):
-    func=random.choice([insert , delete , update])
-    func(hs)
 
 def read_thread(i,que):
     #print 'read %d start' % i
-    hs = Manager(read_servers=[('inet','10.15.1.17',9998,None)],)
+    hs = Manager(read_servers=[('inet','10.15.1.22',9998,None)],)
     
-    t1=timeit.Timer(lambda:read(hs))
-    time_t1=t1.timeit(n)
+    start=datetime.datetime.now()
+    for j in range(n):
+        row=hs.find('mydb', 'mytbl', '=',['uid','name'],['153',],'PRIMARY','1')
+    end=datetime.datetime.now()
     
-    que.put(time_t1)
+    c=end - start 
+    que.put(c.seconds*1000000 + c.microseconds)
     #print 'read %d end' % i
     #return time_t1
 
 def write_thread(i,que):
     #print 'write %d start' % i
-    hs = Manager(write_servers=[('inet','10.15.1.17',9999,None)],)
+    hs = Manager(write_servers=[('inet','10.15.1.22',9999,None)],)
     
-    t1=timeit.Timer(lambda:write(hs))
-    time_t1=t1.timeit(n)
-
-    que.put(time_t1)
-    #print 'write %d end' % i
-    #return time_t1
+    start=datetime.datetime.now()
+    for j in range(n):
+        hs.update('mydb', 'mytbl', '=' , ['name',], ['9999',] ,['__updated',])
+    end=datetime.datetime.now()
+    
+    c=end - start 
+    que.put(c.seconds*1000000 + c.microseconds)
 
 if __name__ == '__main__':
     opts, args = getopt.getopt(sys.argv[1:], "c:r:w:n:")
@@ -80,12 +58,14 @@ if __name__ == '__main__':
     wq=multiprocessing.Queue(w_cnt)
 
     if r_cnt:
+        print 'read'
         for i in range(r_cnt):
             p=multiprocessing.Process(target=read_thread, args=(i,rq))
             r_jobs.append(p)
             p.start()
 
     if w_cnt:
+        print 'write'
         for i in range(w_cnt):
             p=multiprocessing.Process(target=write_thread, args=(i,wq))
             w_jobs.append(p)
@@ -110,11 +90,11 @@ if __name__ == '__main__':
         rs.append(rq.get())
     while not wq.empty():
         ws.append(wq.get())
-
-    rs_total=max(rs)
-    ws_total=max(ws)
-
-    print 'total %f read requests,spent %fs' % (r_requests,rs_total)
-    print 'read request per second:%f' % (  float(r_requests) /float(rs_total) )
-    print 'total %f write requests,spent %fs' % (w_requests,ws_total)
-    print 'write request per second:%f' % ( float(w_requests) /float(ws_total) )
+    if rs:
+        rs_total=max(rs)
+        print 'total %f read requests,spent %fs' % (r_requests,rs_total/1000000)
+        print 'read request per second:%f' % (  float(r_requests*1000000) /float(rs_total) )
+    if ws:
+        ws_total=max(ws)
+        print 'total %f write requests,spent %fs' % (w_requests,ws_total/1000000)
+        print 'write request per second:%f' % ( float(w_requests*1000000) /float(ws_total) )
