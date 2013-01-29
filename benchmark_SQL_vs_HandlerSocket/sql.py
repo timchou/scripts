@@ -3,6 +3,11 @@ from __future__ import division
 from pyhs import Manager,exceptions
 import sys,getopt,math,random,string,timeit,MySQLdb,multiprocessing,datetime
 
+'''
+运行方法:python hs.py -c 100 -r 8 -w 2 -n 100000
+其中c是总共起多少个并发，r和w是读写的比例，n是每个并发循环执行的次数
+'''
+
 n=0
 
 HOST='10.15.1.22'
